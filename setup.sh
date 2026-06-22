@@ -13,7 +13,9 @@ CRYMBLE="$PROJECT_DIR/lib/crymble-ui"
 SFML3="$CRYMBLE/locallib/sfml3"
 CSFML3="$CRYMBLE/locallib/csfml3"
 
-export LD_LIBRARY_PATH="$SFML3/lib/linux:$CSFML3/lib/linux:$LD_LIBRARY_PATH"
-export LIBRARY_PATH="$SFML3/lib/linux:$CSFML3/lib/linux:$LIBRARY_PATH"
+# `:-` defaults so this stays safe to `source` under `set -u` (e.g. from
+# scripts/build-appimage.sh, where these vars are unset on a fresh CI runner).
+export LD_LIBRARY_PATH="$SFML3/lib/linux:$CSFML3/lib/linux:${LD_LIBRARY_PATH:-}"
+export LIBRARY_PATH="$SFML3/lib/linux:$CSFML3/lib/linux:${LIBRARY_PATH:-}"
 export CSFML_INCLUDE_DIR="$CSFML3/include"
-export PKG_CONFIG_PATH="$CSFML3/lib/linux/pkgconfig:$PKG_CONFIG_PATH"
+export PKG_CONFIG_PATH="$CSFML3/lib/linux/pkgconfig:${PKG_CONFIG_PATH:-}"
