@@ -9,6 +9,10 @@ The game logic (`src/minesweeper.cr`) is fully separated from the view/input
 layer (`src/minesweeper-gui.cr`): the GUI only talks to the game through its
 public API and its win/lose callbacks.
 
+<p align="center">
+  <img src="resources/screenshot.png" alt="Minesweeper screenshot" width="480">
+</p>
+
 ## Download
 
 Prebuilt binaries are attached to each [GitHub Release](../../releases/latest):
