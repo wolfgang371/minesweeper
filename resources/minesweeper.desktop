@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Minesweeper
+GenericName=Minesweeper Game
+Comment=Classic minesweeper, built with Crystal + CrymbleUI
+Exec=minesweeper
+Icon=minesweeper
+Categories=Game;LogicGame;
+# SFML 3 derives WM_CLASS from the executable basename (/proc/self/cmdline);
+# inside the AppImage that is "minesweeper", so the running window groups under
+# this launcher's icon in the taskbar.
+StartupWMClass=minesweeper
+Terminal=false

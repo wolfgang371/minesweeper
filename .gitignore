@@ -1,0 +1,11 @@
+/lib/
+/bin/
+/.shards/
+.crystal/
+*.dwarf
+/build/
+# Resolved per `shards install`; not pinned (always builds against the latest
+# crymble-ui that shard.yml allows).
+/shard.lock
+# Python bytecode cache from the asset generators in scripts/.
+__pycache__/

@@ -1,0 +1,123 @@
+name: Release
+
+# Builds the downloadable binaries and attaches them to the GitHub Release when a
+# version tag (v*) is pushed (or manually, for an existing tag, via
+# workflow_dispatch).
+#
+#   Linux   -> minesweeper-linux-x86_64.AppImage   (scripts/build-appimage.sh)
+#   Windows -> minesweeper-windows-x64.exe         (scripts/linux_cross_build_win32.sh,
+#                                                    cross-compiled on Linux)
+#
+# Both jobs run on Linux: the Windows .exe is cross-compiled with the MSVC
+# toolchain via xwin + lld-link, so no Windows runner is needed. Asset names are
+# stable and version-less so a download link can track the newest release
+# (/releases/latest/download/<asset>); the version stays in the Release title.
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build (e.g. v0.2.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  # Create the GitHub Release once, before the parallel build jobs attach assets,
+  # so they only upload (idempotent) instead of racing to create it.
+  create_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure the GitHub Release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; reusing it."
+          else
+            gh release create "$TAG" --repo "$REPO" --title "$TAG" --notes "" --verify-tag
+          fi
+
+  linux:
+    needs: create_release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: "1.20.0"
+
+      - name: Install build + packaging dependencies
+        run: |
+          sudo apt-get update
+          # SFML 3 runtime libs (linking + ldd resolution) plus the AppImage
+          # toolchain's helpers (icon extraction, ELF patching, desktop validation).
+          sudo apt-get install -y --no-install-recommends \
+            libgl1-mesa-dev libopenal1 libfreetype6 \
+            libx11-6 libxrandr2 libxcursor1 libxi6 libudev1 \
+            libvorbisfile3 libflac12 \
+            imagemagick patchelf desktop-file-utils file wget
+
+      - name: shards install
+        run: shards install
+
+      - name: Build AppImage
+        run: bash scripts/build-appimage.sh
+
+      - name: Upload the AppImage to the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: gh release upload "$TAG" build/minesweeper-linux-x86_64.AppImage --repo "$REPO" --clobber
+
+  windows:
+    needs: create_release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: "1.20.0"
+
+      - name: Install cross-link toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lld curl unzip
+
+      - name: shards install
+        run: shards install
+
+      - name: Cache Windows cross-build deps
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/win-crossbuild
+          key: win-crossbuild-crystal1.20.0-${{ hashFiles('scripts/win-setup-deps.sh') }}
+
+      - name: Set up Windows cross-build deps
+        run: ./scripts/win-setup-deps.sh
+
+      - name: Cross-build minesweeper.exe
+        run: ./scripts/linux_cross_build_win32.sh
+
+      - name: Name the asset
+        run: cp build/win/minesweeper.exe minesweeper-windows-x64.exe
+
+      - name: Upload the .exe to the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: gh release upload "$TAG" minesweeper-windows-x64.exe --repo "$REPO" --clobber

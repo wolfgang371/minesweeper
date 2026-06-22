@@ -1,0 +1,19 @@
+name: minesweeper
+version: 0.2.0
+
+authors:
+  - wolfgang
+
+# Build with `shards build minesweeper` (binary lands in bin/).
+# Run directly with `crystal run src/minesweeper-gui.cr`.
+targets:
+  minesweeper:
+    main: src/minesweeper-gui.cr
+
+crystal: ">= 1.0.0"
+
+license: MIT
+
+dependencies:
+  crymble-ui:
+    github: wolfgang371/crymbleui

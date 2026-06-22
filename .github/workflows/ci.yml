@@ -1,0 +1,84 @@
+name: CI
+
+# Build + test on every push / PR. CrymbleUI vendors SFML 3 / CSFML 3 (Linux
+# shared libs under lib/crymble-ui/locallib/{sfml3,csfml3}/lib/linux/, Windows
+# static libs under the sibling .../lib/win32/), so we never build SFML here —
+# `shards install` pulls them and setup.sh wires the linker/loader paths.
+#
+# Two jobs:
+#   linux         — build the native binary + run the (pure-logic) specs.
+#   windows-cross — cross-compile the Windows .exe FROM Linux (same path the
+#                   release uses), via scripts/win-setup-deps.sh +
+#                   linux_cross_build_win32.sh. The xwin MSVC SDK + Crystal
+#                   Windows libs (~hundreds of MB) are cached between runs.
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: "1.20.0"
+
+      - name: Install SFML 3 runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl1-mesa-dev libopenal1 libfreetype6 \
+            libx11-6 libxrandr2 libxcursor1 libxi6 libudev1 \
+            libvorbisfile3 libflac12
+
+      - name: shards install
+        run: shards install
+
+      - name: Build
+        run: |
+          source setup.sh
+          shards build minesweeper
+
+      - name: Specs
+        run: crystal spec
+
+  windows-cross:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: "1.20.0"
+
+      - name: Install cross-link toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lld curl unzip
+
+      - name: shards install
+        run: shards install
+
+      # The MSVC SDK (xwin splat) + Crystal Windows runtime libs are large and
+      # stable; cache them so only the first run pays the download.
+      - name: Cache Windows cross-build deps
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/win-crossbuild
+          key: win-crossbuild-crystal1.20.0-${{ hashFiles('scripts/win-setup-deps.sh') }}
+
+      - name: Set up Windows cross-build deps
+        run: ./scripts/win-setup-deps.sh
+
+      - name: Cross-build minesweeper.exe
+        run: ./scripts/linux_cross_build_win32.sh
+
+      - name: Upload .exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: minesweeper-windows-x64
+          path: build/win/minesweeper.exe
