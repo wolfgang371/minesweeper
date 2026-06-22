@@ -16,14 +16,18 @@ require "./minesweeper"
 
 include CrymbleUI
 
-# Cell images, embedded into the binary at compile time and served from
-# CrSFMLBackend's registry (no runtime file dependency). The registry key is the
-# image name, which is exactly what `cell.to_s` yields for every board value:
-# Symbols (:unknown, :marker, :bomb, :bomb_triggered, :marker_wrong) and the
-# neighbour counts 0..8.
-{% for name in %w(unknown 0 1 2 3 4 5 6 7 8 marker bomb marker_wrong bomb_triggered) %}
-  CrSFMLBackend.register_embedded_image({{name}}, {{ read_file("#{__DIR__}/resources/#{name.id}.png") }}.to_slice)
-{% end %}
+# Cell images, embedded into the binary at compile time as CrymbleUI ImageSources
+# (key + compile-time read_file bytes — the same thing embed_image builds, done in
+# a loop). No runtime file dependency. Keyed by the string `cell.to_s` yields for
+# every board value: the symbols (:unknown, :marker, :bomb, :bomb_triggered,
+# :marker_wrong) and the neighbour counts 0..8.
+CELL_IMAGES = begin
+  images = {} of String => ImageSource
+  {% for name in %w(unknown 0 1 2 3 4 5 6 7 8 marker bomb marker_wrong bomb_triggered) %}
+    images[{{name}}] = ImageSource.new({{name}}, {{ read_file("#{__DIR__}/resources/#{name.id}.png") }}.to_slice)
+  {% end %}
+  images
+end
 
 # Renders the full minesweeper board and dispatches per-cell clicks.
 #
@@ -63,7 +67,7 @@ class Board < Widget
       @n.times do |col|
         rect = Rect.new(Vec2.new(col * CELL, row * CELL), Size.new(CELL, CELL))
         tint = pressed == {row, col} ? PRESSED_TINT : Color.white
-        prims << DrawImage.new(@game.cell(row, col).to_s, rect, tint)
+        prims << DrawImage.new(CELL_IMAGES[@game.cell(row, col).to_s], rect, tint)
       end
     end
     prims
