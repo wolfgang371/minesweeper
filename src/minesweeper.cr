@@ -93,6 +93,16 @@ class Minesweeper
         end
         cell
     end
+    # Reveal the largest area a single pick would open — a "free opening" for a
+    # fresh board. Picks a cell inside the biggest 8-connected zero-region and
+    # lets pick_direct's normal cascade reveal the rest (firing on_change as it
+    # goes). Returns the picked cell, or nil if the board has no zero-region.
+    def reveal_biggest_region : Tuple(Int32, Int32)?
+        if cell = biggest_region
+            pick_direct(*cell)
+            cell
+        end
+    end
     SYMBOL_CHARS = {:unknown => " ", :marker => "M", :bomb => "*", :bomb_triggered => "!", :marker_wrong => "X"}
     def to_s(io : IO) : Nil
         @board_matrix.each do |row|
@@ -129,6 +139,40 @@ class Minesweeper
             reveal_board
             @on_win.try &.call
         end
+    end
+    # Pure analysis of the bomb layout (no board mutation, no callbacks): find a
+    # seed cell of the largest 8-connected component of zero-cells. A "zero-cell"
+    # is a non-bomb whose neighbour_bombs is 0 — exactly the cells whose pick
+    # cascades — so its components are the openable regions, sized by zero-cell
+    # count. Returns nil only when the board has no zero-cell at all.
+    private def biggest_region : Tuple(Int32, Int32)?
+        zero = Array.new(@n) {|r| Array.new(@n) {|c| !@bombs_matrix[r][c] && neighbour_bombs(r, c) == 0}}
+        seen = Array.new(@n) {Array.new(@n, false)}
+        best : Tuple(Int32, Int32)? = nil
+        best_size = 0
+        @n.times do |row|
+            @n.times do |col|
+                next unless zero[row][col] && !seen[row][col]
+                stack = [{row, col}] # flood this component's 8-connected zero-cells
+                seen[row][col] = true
+                size = 0
+                until stack.empty?
+                    r, c = stack.pop
+                    size += 1
+                    each_neighbour(r, c) do |nr, nc|
+                        if zero[nr][nc] && !seen[nr][nc]
+                            seen[nr][nc] = true
+                            stack << {nr, nc}
+                        end
+                    end
+                end
+                if size > best_size
+                    best_size = size
+                    best = {row, col}
+                end
+            end
+        end
+        best
     end
     private OFFSETS = [{-1,-1},{-1,0},{-1,1},{0,-1},{0,1},{1,-1},{1,0},{1,1}]
     private def each_neighbour(row, col, &)

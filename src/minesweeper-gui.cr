@@ -141,22 +141,36 @@ class Board < Widget
 end
 
 class MinesweeperApp < App
-  N     = 30
-  BOMBS = (N * N * 0.20).to_i # 20% bomb density (matches the original)
+  # Board configuration choices, offered as combo boxes so only sensible values
+  # are selectable. Sizes stop at 30 — the largest board that fits the window
+  # (30 * 32px). Bomb counts are offered as densities of the current board, so
+  # changing the size keeps the difficulty; 20% matches the original.
+  SIZES     = [8, 10, 12, 16, 20, 24, 30]
+  DENSITIES = [10, 12, 15, 18, 20, 22, 25] # percent of cells holding a bomb
 
   state autosolver : Bool = true # on by default, as in the original
+  state autostart : Bool = true  # free opening (reveal the biggest region) on new games
+  state size_index : Int32 = SIZES.size - 1      # 30x30, as in the original
+  state density_index : Int32 = DENSITIES.index!(20)
   state gameover : Symbol? = nil # nil | :won | :lost
 
-  @game : Minesweeper
+  # Placeholder until initialize wires up the real game: new_game's callbacks
+  # capture self, which Crystal only allows once every ivar is set.
+  @game = Minesweeper.new(1, 0)
   @board_changed = false
   @timer_started = false
 
   def initialize
     super()
-    @game = Minesweeper.new(N, BOMBS)
-    @game.on_win { self.gameover = :won }
-    @game.on_lose { self.gameover = :lost }
-    @game.on_change { |_row, _col, _cell| @board_changed = true }
+    @game = new_game
+  end
+
+  private def n : Int32
+    SIZES[size_index]
+  end
+
+  private def bombs_for(density : Int32) : Int32
+    (n * n * density / 100).to_i
   end
 
   def build : Widget
@@ -164,17 +178,36 @@ class MinesweeperApp < App
 
     # Hoisted so we can keep keyboard focus on it: Space / "m" act on the cell
     # under the mouse, the same as a left / right click (original imgui controls).
-    board = Board.new(@game, N,
+    board = Board.new(@game, n,
       ->(row : Int32, col : Int32) { left_click(row, col) },
       ->(row : Int32, col : Int32) { right_click(row, col) },
       -> { @last_mouse_position })
     board.request_focus
 
-    window("Minesweeper", 1000, 1040) do
-      vstack(id: "root", padding: 10.0, spacing: 8.0) do
-        hstack(spacing: 20.0) do
-          text("#{@game.remaining_bombs} bombs left", font_scale: 1)
-          checkbox("Autosolver?", checked: autosolver) { self.autosolver = !autosolver }
+    window("Minesweeper", 1000, 1070) do
+      vstack(id: "root", padding: 10.0, spacing: 14.0) do
+        vstack(spacing: 6.0) do
+          # Changing size or bomb count starts a new game with the new settings.
+          hstack(spacing: 16.0) do
+            text("#{@game.remaining_bombs} bombs left", font_scale: 1)
+            # F2, as in the classic game: a plain letter is too easy to hit by
+            # accident, and a browser tab never sees Ctrl+N (web build).
+            button("New game", shortcut: "F2") { restart_game }
+            text("Size:")
+            combo_box(items: SIZES.map { |s| "#{s}x#{s}" }, selected: size_index, width: 100.0) do |idx, _|
+              self.size_index = idx
+              restart_game
+            end
+            text("Bombs:")
+            combo_box(items: DENSITIES.map { |d| "#{bombs_for(d)} (#{d}%)" }, selected: density_index, width: 120.0) do |idx, _|
+              self.density_index = idx
+              restart_game
+            end
+            checkbox("Auto-start?", checked: autostart) { self.autostart = !autostart }
+            checkbox("Autosolver?", checked: autosolver) { self.autosolver = !autosolver }
+          end
+
+          text("Left click / Space: reveal, chord  |  Right click / m: toggle marker", font_scale: -1)
         end
 
         widget board
@@ -211,9 +244,21 @@ class MinesweeperApp < App
     request_rebuild
   end
 
+  # A fresh game with the current settings. Always a new instance (not
+  # Minesweeper#restart), since size and bomb count may have changed.
+  private def new_game : Minesweeper
+    game = Minesweeper.new(n, bombs_for(DENSITIES[density_index]))
+    game.on_win { self.gameover = :won }
+    game.on_lose { self.gameover = :lost }
+    game.on_change { |_row, _col, _cell| @board_changed = true }
+    game.reveal_biggest_region if autostart # free opening: open the biggest region up front
+    game
+  end
+
   private def restart_game
-    @game.restart
-    self.gameover = nil # state setter triggers the rebuild
+    self.gameover = nil # first: a free opening on a small board can win outright
+    @game = new_game
+    request_rebuild # gameover may already be nil, so don't rely on its setter
   end
 
   # The scheduler only exists once the renderer is up, so start the repeating
@@ -232,8 +277,8 @@ class MinesweeperApp < App
   private def autosolve_tick
     return unless autosolver && gameover.nil?
     @board_changed = false
-    N.times do |row|
-      N.times do |col|
+    n.times do |row|
+      n.times do |col|
         @game.pick_indirect(row, col) if gameover.nil?
       end
     end

@@ -13,6 +13,13 @@ public API and its win/lose callbacks.
   <img src="resources/screenshot.png" alt="Minesweeper screenshot" width="480">
 </p>
 
+## Play in your browser
+
+**[Play Minesweeper online](https://wolfgang371.github.io/minesweeper/)** — the
+same game compiled to WebAssembly (crymble-ui's web build), nothing to install.
+Needs a current desktop browser (Chrome, Edge, Firefox or Safari) with a mouse
+and a keyboard; about 1.4 MB to download.
+
 ## Download
 
 Prebuilt binaries are attached to each [GitHub Release](../../releases/latest):
@@ -31,6 +38,12 @@ Prebuilt binaries are attached to each [GitHub Release](../../releases/latest):
   under the mouse cursor (Space reveals/chords, **m** toggles a marker).
 - **Autosolver?** — when checked, the solver repeatedly applies the obvious
   deductions until it gets stuck (or wins/loses).
+- **Auto-start?** — when checked (default), every new game starts with a free
+  opening: the biggest connected empty region is revealed up front. Takes effect
+  on the next new game.
+- **New game** (or **F2**) — abandon the current game and start a fresh one.
+- **Size** / **Bombs** — board size (8x8 up to 30x30) and bomb count (10–25% of
+  the cells, 20% by default). Changing either starts a new game.
 - On game over, a popup offers **Yes** (play again) or **No** (quit).
 
 ## Build & run
@@ -51,6 +64,20 @@ During development you can also run directly:
 source setup.sh
 crystal run src/minesweeper-gui.cr
 ```
+
+### Web build (WebAssembly)
+
+The same source also builds as a static web page (crymble-ui >= 1.9,
+Linux x86_64 build host):
+
+```sh
+bin/crymble-web setup                # once: the WebAssembly toolchain (~1 GB, a few minutes)
+bin/crymble-web build minesweeper    # → bin/web/minesweeper/ (the whole site)
+bin/crymble-web serve minesweeper    # try it: http://127.0.0.1:8765/
+```
+
+See crymble-ui's [docs/WEB.md](https://github.com/wolfgang371/crymbleui/blob/main/docs/WEB.md)
+for the toolchain's requirements and what differs from the desktop.
 
 ### Windows build (cross-compiled from Linux)
 

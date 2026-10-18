@@ -43,6 +43,14 @@ jobs:
           source setup.sh
           shards build minesweeper
 
+      # The web build needs crymble-ui's patched compiler to BUILD, but the stock
+      # one type-checks it - so a change that breaks the web page is caught here.
+      - name: The web build type-checks (stock compiler)
+        run: |
+          source setup.sh
+          crystal build --no-codegen --cross-compile --target wasm32-unknown-wasi -Dwithout_mt -Dwithout_main \
+            src/minesweeper-gui.cr
+
       - name: Specs
         run: crystal spec
 
