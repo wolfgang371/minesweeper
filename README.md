@@ -17,8 +17,8 @@ public API and its win/lose callbacks.
 
 **[Play Minesweeper online](https://wolfgang371.github.io/minesweeper/)** — the
 same game compiled to WebAssembly (crymble-ui's web build), nothing to install.
-Needs a current desktop browser (Chrome, Edge, Firefox or Safari) with a mouse
-and a keyboard; about 1.4 MB to download.
+Needs a current desktop browser (Chrome, Edge, Firefox or Safari; tested in
+Chromium and Firefox) with a mouse and a keyboard; about 1.4 MB to download.
 
 ## Download
 
